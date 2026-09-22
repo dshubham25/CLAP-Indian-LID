@@ -398,7 +398,7 @@ def evaluate(dataset_dir, dataset_name, model_path="fusion_model_best.pt"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", required=True, choices=["vaani", "voxlingua", "common_voice", "all"],
+    parser.add_argument("--dataset", required=True, choices=["vaani", "voxlingua", "fleurs", "all"],
                        help="Which dataset to evaluate on")
     parser.add_argument("--model", default="fusion_model_best.pt",
                        help="Path to trained model weights")
@@ -411,15 +411,22 @@ if __name__ == "__main__":
             print(f"ERROR: Vaani directory not found at {VAANI_DIR}")
     
     if args.dataset in ["voxlingua", "all"]:
-        vox_dir = prepare_voxlingua()
-        if vox_dir:
-            evaluate(vox_dir, "VoxLingua107", args.model)
+        # First check custom 40-lang extract folder, then default extract folder
+        custom_vox = os.path.expanduser("~/clap_fusion/voxlingua_all_200")
+        if os.path.exists(custom_vox) and len(os.listdir(custom_vox)) > 0:
+            evaluate(custom_vox, "VoxLingua107", args.model)
+        elif os.path.exists(VOXLINGUA_EXTRACT_DIR) and len(os.listdir(VOXLINGUA_EXTRACT_DIR)) > 0:
+            evaluate(VOXLINGUA_EXTRACT_DIR, "VoxLingua107", args.model)
         else:
-            print(f"ERROR: Could not find/extract VoxLingua107 data")
+            vox_dir = prepare_voxlingua()
+            if vox_dir:
+                evaluate(vox_dir, "VoxLingua107", args.model)
+            else:
+                print(f"ERROR: Could not find/extract VoxLingua107 data")
             
-    if args.dataset in ["common_voice", "all"]:
-        cv_dir = os.path.expanduser("~/clap_fusion/common_voice_extracted")
-        if os.path.exists(cv_dir):
-            evaluate(cv_dir, "CommonVoice", args.model)
+    if args.dataset in ["fleurs", "all"]:
+        fleurs_dir = os.path.expanduser("~/clap_fusion/fleurs_extracted")
+        if os.path.exists(fleurs_dir) and len(os.listdir(fleurs_dir)) > 0:
+            evaluate(fleurs_dir, "Google_FLEURS", args.model)
         else:
-            print(f"ERROR: Common Voice dir not found. Run download_cv.py first!")
+            print(f"ERROR: FLEURS directory not found at {fleurs_dir}. Run download_fleurs.py first!")
