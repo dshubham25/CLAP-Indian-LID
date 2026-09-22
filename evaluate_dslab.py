@@ -62,10 +62,19 @@ FOLDER_NAME_MAP = {
     "pa": "Punjabi", "pun": "Punjabi", "as": "Assamese", "asm": "Assamese",
     "mai": "Maithili", "sat": "Santali", "ks": "Kashmiri", "kas": "Kashmiri",
     "ne": "Nepali", "sd": "Sindhi", "kok": "Konkani", "doi": "Dogri",
-    "mni": "Manipuri", "brx": "Bodo", "sa": "Sanskrit", "san": "Sanskrit",
     "en": "English", "eng": "English",
     "hin": "Hindi", "ben": "Bengali", "mar": "Marathi", "tel": "Telugu",
     "tam": "Tamil", "guj": "Gujarati", "kan": "Kannada", "mal": "Malayalam",
+    # International VoxLingua ISO codes
+    "ar": "Arabic", "bg": "Bulgarian", "cs": "Czech", "da": "Danish",
+    "de": "German", "el": "Greek", "es": "Spanish", "et": "Estonian",
+    "fa": "Persian", "fi": "Finnish", "fr": "French", "hr": "Croatian",
+    "hu": "Hungarian", "it": "Italian", "ja": "Japanese", "ko": "Korean",
+    "lt": "Lithuanian", "lv": "Latvian", "mt": "Maltese", "nl": "Dutch",
+    "pl": "Polish", "pt": "Portuguese", "ro": "Romanian", "ru": "Russian",
+    "sk": "Slovak", "sl": "Slovenian", "sv": "Swedish", "sw": "Swahili",
+    "th": "Thai", "tk": "Turkmen", "tr": "Turkish", "uk": "Ukrainian",
+    "vi": "Vietnamese", "zh": "Chinese",
 }
 
 # --- GATED FUSION ARCHITECTURE ---
