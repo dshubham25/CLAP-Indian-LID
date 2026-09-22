@@ -1,5 +1,5 @@
 import os
-import soundfile as sf
+import datasets
 from datasets import load_dataset
 from tqdm import tqdm
 
@@ -38,8 +38,9 @@ def download_fleurs():
         os.makedirs(lang_dir, exist_ok=True)
         
         try:
-            # Streams directly from Hugging Face - zero auth or disk bloat
+            # Set decode=False so it streams raw audio bytes directly without requiring torchcodec
             dataset = load_dataset("google/fleurs", lang_code, split="test", streaming=True)
+            dataset = dataset.cast_column("audio", datasets.Audio(decode=False))
             
             count = 0
             for item in tqdm(dataset, total=200, desc=lang_name):
@@ -47,14 +48,14 @@ def download_fleurs():
                     break
                     
                 audio = item['audio']
-                audio_array = audio['array']
-                sample_rate = audio['sampling_rate']
-                
                 out_path = os.path.join(lang_dir, f"{lang_name}_{count}.wav")
-                sf.write(out_path, audio_array, sample_rate)
-                count += 1
                 
-            print(f"  Successfully saved {count} files for {lang_name}")
+                if 'bytes' in audio and audio['bytes']:
+                    with open(out_path, 'wb') as f:
+                        f.write(audio['bytes'])
+                    count += 1
+                
+            print(f"  Successfully saved {count} raw audio files for {lang_name}")
             
         except Exception as e:
             print(f"  Error downloading {lang_name}: {e}")
