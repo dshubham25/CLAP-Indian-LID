@@ -1,0 +1,184 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit, calc}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Phonetically-Conditioned Audio-Text Models for Robust Zero-Shot Language Identification}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Shubham Dikshit}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Your University Name}\\
+City, Country \\
+email@domain.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Language identification (LID) is traditionally handled as a supervised, closed-set classification task. While contrastive language-audio pretraining (CLAP) models offer a compelling alternative for open-vocabulary, zero-shot audio classification, they are easily disrupted by acoustic domain shifts. Specifically, we observe that CLAP embeddings heavily encode background noise, microphone impulse responses, and environmental acoustics rather than the underlying linguistic content. This bias causes severe performance degradation on out-of-domain speech. To address this limitation, we propose a hybrid architecture that conditions CLAP embeddings on robust phonetic features extracted from an auxiliary speech foundation model (Whisper). Rather than naively concatenating these features, we design a gating mechanism where the phonetic features generate an attention mask to selectively suppress non-linguistic noise within the CLAP representation. Furthermore, to prevent the gating network from simply memorizing corpus-specific acoustics, we introduce feature-space noise injection alongside multi-prompt text ensembling. Comprehensive experiments on diverse Indian language datasets indicate that while baseline zero-shot CLAP accuracy collapses from 93.02\% on clean data to 34.83\% on noisy YouTube audio, our robust phonetically-gated approach restores noisy-domain accuracy to 80.57\%. Additionally, the proposed regularization techniques allow the model to maintain 66.41\% accuracy across entirely unseen corpora. We provide an extensive layer-wise analysis of the phonetic encoder and discuss the remaining challenges of spatial hubness for completely unseen languages in contrastive frameworks.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Language Identification, Zero-Shot Learning, Speech Foundation Models, Contrastive Learning, Gated Attention, Domain Adaptation
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Identifying the spoken language in an audio stream serves as the foundational first step for most multilingual speech processing pipelines, enabling downstream tasks like automatic speech recognition (ASR) and machine translation to route audio to the correct language-specific models. Conventional methods model LID as a closed-set problem, restricting the system to recognizing only the languages present in its training data. Over the past few years, the push toward large-scale speech foundation models (SFMs) like Whisper \cite{radford2023robust} and Massively Multilingual Speech (MMS) \cite{pratap2023scaling} has significantly improved the resilience of these closed-set systems. By leveraging hundreds of thousands of hours of weakly supervised audio, models like Whisper are highly invariant to background noise and varying acoustic environments. However, because they rely on predefined vocabularies or fixed classification heads, they lack the inherent flexibility to identify out-of-vocabulary languages dynamically without extensive retraining or fine-tuning.
+
+In contrast to purely audio-based supervised classification, contrastive models such as Contrastive Language-Audio Pretraining (CLAP) \cite{elizalde2023clap, wu2023large} project both audio and text into a shared, joint embedding space. This allows for zero-shot classification by computing the cosine similarity between an incoming audio clip and a set of natural language text prompts (e.g., \textit{``A person speaking Marathi''}). While highly effective for general environmental sound classification and audio retrieval, applying CLAP directly to fine-grained speech tasks like LID presents major challenges. 
+
+Our initial diagnostic experiments show that CLAP representations are disproportionately biased toward the overall acoustic texture of a recording---such as room impulse response or background music---rather than the phonetic characteristics of the speech itself. Consequently, when transitioning from a clean training corpus to noisy, real-world data (such as user-generated YouTube content), the model's zero-shot accuracy deteriorates rapidly. This lack of acoustic robustness severely limits the deployment of contrastive zero-shot models in real-world scenarios.
+
+To capture both the phonetic stability of SFMs and the open-vocabulary flexibility of contrastive models, we explore methods for fusing these architectures. We demonstrate that simply concatenating the features yields marginal improvements, as the model cannot discern which features to trust under heavy noise. Instead, we propose a novel Gated Fusion mechanism. By using the phonetic representations from Whisper to generate a learned attention mask, we selectively filter out irrelevant acoustic noise from the CLAP audio embeddings before aligning them with the text space. 
+
+Furthermore, early iterations of our fusion model revealed a strong tendency to overfit to the specific recording conditions of the training set, causing significant accuracy drops when evaluating across different corpora. To stop the network from overfitting to the specific microphones and environments of the training set, we augment the feature space during training via Gaussian noise injection and stabilize the contrastive targets through multi-prompt ensembling.
+
+The primary contributions of this work are:
+\begin{enumerate}
+    \item We empirically demonstrate and quantify the vulnerability of CLAP to acoustic and corpus shifts in the context of highly diverse Indian spoken languages.
+    \item We propose a novel Gated Fusion mechanism that leverages a pre-trained SFM as a control signal to restore the robustness of zero-shot audio-text embeddings.
+    \item We analyze the impact of phonetic abstraction by evaluating gating signals across different depths of the Whisper encoder.
+    \item We provide a comprehensive evaluation across in-domain (clean), cross-domain (noisy), and cross-corpus datasets, explicitly detailing the success of feature-space augmentation in achieving cross-corpus generalization.
+\end{enumerate}
+
+\section{Related Work}
+
+\subsection{Speech Foundation Models for LID}
+The field of speech processing has been transformed by self-supervised and weakly supervised foundation models. Architectures like wav2vec 2.0 \cite{baevski2020wav2vec}, HuBERT \cite{hsu2021hubert}, and w2v-BERT have shown that learning discrete speech units from unlabeled audio yields highly effective phonetic representations. More recently, OpenAI's Whisper \cite{radford2023robust} utilized over 680,000 hours of weakly labeled multilingual data to train a massive encoder-decoder transformer. Whisper's encoder is remarkably robust to background noise and accents, making it a state-of-the-art feature extractor for LID. Similarly, Meta's MMS \cite{pratap2023scaling} expanded coverage to over 1,000 languages. Despite their robustness, adapting these models to novel, open-set LID tasks requires either training a new classification head or mapping their decoding tokens to a specific taxonomy, sacrificing true zero-shot, open-vocabulary flexibility.
+
+\subsection{Audio-Text Contrastive Learning}
+Building on the success of CLIP in the vision domain, CLAP models \cite{elizalde2023clap, wu2023large} are trained via an InfoNCE loss to maximize the agreement between paired audio and text embeddings. While this enables powerful zero-shot capabilities for tasks like sound event detection and audio captioning, the training distribution naturally biases the audio encoder toward broad, scene-level acoustics. Recent work has noted this limitation, observing that contrastive audio models struggle with fine-grained semantic tasks like speaker identification or dialect recognition because they encode the ``sound'' of the environment rather than the linguistic content. While some approaches attempt to bridge this gap by fine-tuning CLAP on speech data, directly conditioning the contrastive audio space on structural phonetics remains relatively unexplored.
+
+\subsection{Modality Gating and Multi-Modal Attention}
+Controlling the flow of information between different representations is a well-studied problem in multi-modal deep learning. Techniques like Gated Multimodal Units \cite{arevalo2017gated} allow networks to dynamically decide which modality to trust for a given input. Similarly, Squeeze-and-Excitation Networks \cite{hu2018squeeze} learn to dynamically weight feature channels based on auxiliary global context. We adopt this philosophy by treating the SFM's phonetic output as a semantic control signal that modulates the broader acoustic representation of the contrastive model.
+
+\section{Proposed Architectures}
+
+To address the limitations of contrastive audio-text models in noisy speech environments, we explored methods for fusing CLAP with the phonetic stability of Whisper. Let $\mathbf{c} \in \mathbb{R}^{D_c}$ denote the global audio embedding extracted from the CLAP encoder, and $\mathbf{w} \in \mathbb{R}^{D_w}$ denote the phonetic embedding from the Whisper encoder. In our experiments, $D_c = 1024$ and $D_w = 512$.
+
+The standard CLAP architecture acts as our primary baseline, where classification is performed by calculating the highest cosine similarity between the generic audio embedding and text embeddings. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{example-image-a} % Replace with 'base_clap_architecture.png'
+    \caption{Baseline Zero-Shot CLAP Architecture. The model relies entirely on the contrastive audio-text latent space without external phonetic guidance.}
+    \label{fig:base_clap}
+\end{figure}
+
+As an initial step to integrate phonetic awareness, we experimented with a straightforward early-fusion approach. The features from both models are concatenated along the feature dimension and passed through a Multi-Layer Perceptron (MLP) to project them back into the dimension expected by the CLAP text space: $\mathbf{z}_{audio} = \mathbf{W}_{mlp} [\mathbf{c} \parallel \mathbf{w}] + \mathbf{b}_{mlp}$. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{example-image-b} % Replace with 'simple_mlp_fusion.png'
+    \caption{Simple MLP Fusion. Phonetic Whisper features and CLAP acoustic features are concatenated and projected statically.}
+    \label{fig:mlp_fusion}
+\end{figure}
+
+While computationally simple, this naive fusion forces the network to assign static, learned weights to the concatenated features. Consequently, the network fails to dynamically suppress the CLAP features when they contain overwhelming background noise, allowing the noisy CLAP features to actively degrade the clean phonetic signal provided by Whisper under severe domain shift.
+
+To allow the network to intelligently filter out non-linguistic noise on a per-sample basis, we introduced a Sigmoid attention gate (Gated Fusion v1). The core intuition is that Whisper's noise-invariant phonetic features can serve as a guide to identify which dimensions of the CLAP embedding actually correspond to relevant speech, rather than background acoustics. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{example-image-c} % Replace with 'gated_fusion_v1.png'
+    \caption{Gated Fusion (v1). Whisper phonetic features generate an attention mask to dynamically filter non-linguistic noise from the CLAP embeddings.}
+    \label{fig:gated_fusion}
+\end{figure}
+
+We first project the Whisper feature $\mathbf{w}$ to match the dimensionality of the CLAP feature $\mathbf{c}$, and apply a Sigmoid activation to generate an attention mask $\mathbf{m} = \sigma(\mathbf{W}_{gate} \mathbf{w} + \mathbf{b}_{gate})$. We then apply this mask element-wise to the CLAP embedding to produce a filtered acoustic representation: $\tilde{\mathbf{c}} = \mathbf{c} \odot \mathbf{m}$. By pushing irrelevant dimensions toward zero, the mask actively suppresses acoustic noise. This filtered representation is concatenated with the original phonetic features to ensure no linguistic data is lost, and projected to the final text-aligned latent space $\mathbf{z}_{audio} = \mathbf{W}_{fuse} [\tilde{\mathbf{c}} \parallel \mathbf{w}] + \mathbf{b}_{fuse}$. The entire fusion network is trained using a standard contrastive InfoNCE loss against the target CLAP text embeddings $\mathbf{z}_{text}$.
+
+While this gating mechanism successfully mitigated background noise in cross-domain scenarios, testing on entirely new recording corpora revealed a severe tendency to overfit. Because the training data contained specific microphone frequency responses and room acoustics, the gating network essentially memorized the inverse of those specific acoustic signatures rather than learning generalized phonetic filtering. To force the network to learn robust representations, we implemented feature-space noise injection and multi-prompt ensembling in our final architecture (Robust Gated Fusion v2).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\columnwidth]{example-image} % Replace with 'robust_gated_fusion_v2.png'
+    \caption{Robust Gated Fusion (v2). Gaussian noise and dropout are injected into the CLAP features before masking, forcing the gate to generalize. The text target is expanded via multi-prompt ensembling.}
+    \label{fig:robust_fusion}
+\end{figure}
+
+During training, we intentionally corrupt the incoming CLAP features $\mathbf{c}$ before they reach the gating mechanism by adding Gaussian noise $\mathcal{N}(0, \sigma^2)$ and applying aggressive dropout with probability $p$: $\mathbf{c}_{aug} = \text{Dropout}(\mathbf{c} + \mathcal{N}(0, \sigma^2), p)$. By making the acoustic features unreliable and highly variable during training, the network cannot rely on memorized acoustic patterns. Instead, it is forced to rely on the clean, stable Whisper features $\mathbf{w}$ to construct the attention mask. 
+
+Simultaneously, to prevent the contrastive space from collapsing toward certain default languages (the ``hubness'' problem), we broaden the text target distribution. Instead of a single text prompt per language, we ensemble the text target by averaging the embeddings from $K$ diverse templates (e.g., \textit{``Spoken \{\}''}, \textit{``Speech in the \{\} language''}):
+\begin{equation}
+    \mathbf{z}_{text} = \text{L2\_Normalize}\left(\frac{1}{K} \sum_{k=1}^{K} \text{Encoder}_{text}(\text{Prompt}_k)\right)
+\end{equation}
+This creates a wider, more stable semantic anchor for the audio embeddings to align with during training.
+
+\section{Experimental Setup}
+
+\subsection{Datasets}
+We designed our evaluation to test both acoustic resilience (noise) and generalization across different recording environments (corpora). We utilized three distinct data regimes focusing on Indian languages, which are characterized by high dialectal diversity and frequent code-switching:
+
+\begin{enumerate}
+    \item \textbf{EkStep (In-Domain):} A relatively clean dataset used for training and in-domain testing. We utilized 8 languages: Marathi, Kannada, English, Odia, Punjabi, Malayalam, Telugu, and Gujarati. For in-domain evaluation, we utilized a strict 80/20 train-test split.
+    
+    \item \textbf{YouTube (Cross-Domain):} A dataset scraped from YouTube containing heavy background noise, commercial music, and overlapping sounds. This dataset covers the exact same 8 languages seen in the EkStep training set. We use this strictly for zero-shot testing to isolate and measure acoustic robustness.
+    
+    \item \textbf{Vaani (Cross-Corpus):} A separate, crowdsourced corpus recorded across various states in India under completely different conditions (different mobile devices, bitrates, and environments). We use this to test corpus generalization. The dataset was split into 5 languages the model was trained on (Seen: English, Gujarati, Malayalam, Marathi, Odia) and 2 completely novel languages (Unseen: Assamese, Hindi) to test true zero-shot boundaries.
+\end{enumerate}
+
+\subsection{Implementation Details}
+All audio was resampled to 16kHz for Whisper and 48kHz for CLAP. We utilized the 2023 version of MS-CLAP and the OpenAI Whisper-Base model. Features were pre-extracted and cached to optimize training. The fusion network was trained using the Adam optimizer with a learning rate of $1e-4$ and a weight decay of $1e-3$ for 40 epochs. Performance was evaluated using accuracy, precision, recall, and macro F1-scores.
+
+\section{Results and Discussion}
+
+\begin{table*}[t]
+\centering
+\caption{Zero-Shot Language Identification Accuracy (\%)}
+\label{tab:results}
+\resizebox{0.8\textwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model Architecture} & \textbf{EkStep (In-Domain)} & \textbf{YouTube (Noise Shift)} & \textbf{Vaani (Corpus Shift - Seen)} & \textbf{Vaani (Unseen)} \\ \midrule
+\textit{Independent Baselines} & & & & \\
+Zero-Shot CLAP & 93.02 & 34.83 & - & - \\
+Whisper Linear Probe (Supervised) & 95.76 & 82.77 & - & - \\ \midrule
+\textit{Fusion Approaches (Zero-Shot)} & & & & \\
+Simple MLP Fusion & - & 56.19 & - & - \\
+Gated Fusion (v1) & - & 76.24 & 48.29 & 4.50 \\
+\textbf{Robust Fusion (v2)} & \textbf{96.68} & \textbf{80.57} & \textbf{66.41} & \textbf{4.90} \\ \bottomrule
+\end{tabular}%
+}
+\end{table*}
+
+\subsection{Overcoming Acoustic Domain Shift}
+The diagnostic results in Table \ref{tab:results} confirm our initial hypothesis regarding CLAP's acoustic vulnerability. Under the clean, controlled conditions of the EkStep dataset, the zero-shot CLAP baseline performs exceptionally well (93.02\%). However, when exposed to the heavy background noise and music of the YouTube dataset, performance plummets to 34.83\%. Conversely, the Whisper linear probe drops only marginally to 82.77\%, demonstrating the resilience of phonetic encoding.
+
+Our Simple MLP Fusion architecture provided a modest bump to 56.19\% on the YouTube data. This confirms that merely appending phonetic data to acoustic data is insufficient; if the network lacks a mechanism to dynamically isolate the noise, the noisy CLAP dimensions overwhelm the clean Whisper signal. 
+
+The introduction of the attention mask in Gated Fusion (v1) effectively resolved this interference. By selectively suppressing the noise components, v1 restored accuracy on the noisy YouTube data to 76.24\%, proving the viability of phonetically-guided acoustic masking.
+
+\subsection{Layer-Wise Phonetic Analysis}
+To determine which depth of the Whisper encoder provides the optimal control signal for the attention gate, we conducted a layer-wise analysis. We extracted features from Whisper at Layer 2 (early acoustics), Layer 4 (intermediate representations), and Layer 6 (deep phonetics). When trained with Gated Fusion v1 on the YouTube dataset, Layer 2 achieved only 38.73\% accuracy. Layer 4 improved significantly to 67.47\%, while Layer 6 provided the best gating signal at 75.59\%. This progression confirms that the gate requires abstract, noise-invariant phonetic information rather than shallow acoustic features to effectively mask the CLAP embeddings.
+
+\subsection{Cross-Corpus Generalization}
+Despite its success on noisy data, Gated Fusion (v1) exhibited severe overfitting when transferred to a completely new recording environment. When evaluated on the clean, seen languages of the Vaani corpus, accuracy collapsed to 48.29\%. The gate had essentially memorized the frequency response of the EkStep microphones.
+
+By applying our feature-space noise injection and multi-prompt ensembling (Robust Fusion v2), we forced the network to learn generalized, corpus-agnostic filtering. This architectural refinement boosted cross-corpus accuracy on Vaani by over 18\% absolute, reaching 66.41\%. Furthermore, this aggressive regularization pushed the noisy YouTube accuracy to 80.57\%, nearly matching the supervised Whisper probe (82.77\%) while retaining the crucial flexibility of open-vocabulary zero-shot text prompting. Under in-domain conditions (EkStep holdout), the robust fusion model achieved 96.68\%, indicating that the regularization did not degrade the model's base alignment capabilities.
+
+\subsection{The Unseen Language Hubness Problem}
+While the robust architecture generalized effectively for languages seen during training, true zero-shot inference on entirely novel languages remains an open challenge. On the unseen Vaani languages (Assamese and Hindi), accuracy hovered around a mere 4.90\%. 
+
+An in-depth analysis of the confusion matrices reveals a pronounced ``black hole'' effect. The model exhibits extremely high precision when it does predict an unseen language (e.g., achieving 1.00 precision for Hindi), but its recall is near zero. Faced with novel phonetics, the audio embeddings fail to cluster near the correct unseen text prompts in the latent space. Instead, the contrastive space defaults to predicting the most frequent or central seen language (in our case, English). This suggests a fundamental geometric limitation in how contrastive text embeddings attract uncertain audio vectors. While our gating mechanism successfully isolates the phonetics, mapping completely unseen phonetic structures to dense, pre-trained text embeddings likely requires post-hoc calibration, margin-based scaling, or few-shot adaptation to overcome this structural hubness.
+
+\section{Conclusion and Future Work}
+We presented a novel phonetically-conditioned gating architecture designed to correct the severe acoustic vulnerabilities inherent in contrastive audio-text models for spoken language identification. By utilizing a speech foundation model to generate an attention mask, we successfully filtered non-linguistic noise from the open-vocabulary audio representation. Paired with feature-space noise injection and prompt ensembling, our robust fusion network proved highly resilient to both severe acoustic noise and cross-corpus shifts on seen languages, bridging the gap between supervised speech models and zero-shot contrastive frameworks. Future efforts will focus on mitigating contrastive hubness to improve the boundary conditions for completely unseen languages, potentially through test-time transductive calibration or temperature scaling.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

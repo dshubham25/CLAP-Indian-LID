@@ -2,3 +2,7 @@
 *.pt
 __pycache__/
 .DS_Store
+*.npz
+*.pt
+*.tmp
+*.log

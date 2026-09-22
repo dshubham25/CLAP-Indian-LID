@@ -1,0 +1,22 @@
+=== LoRA CLAP Configuration ===
+Mode: features, Rank: 8, Alpha: 16.0, Epochs: 1, LR: 0.0001
+Best Seen Validation Accuracy: 0.7139
+Unseen Zero-Shot Accuracy: 0.0010
+Per-Language Unseen Accuracy:
+  Hindi: 0.0008
+  Assamese: 0.0001
+  Bengali: 0.0024
+  Tamil: 0.0000
+--------------------------------------------------
+
+=== LoRA CLAP Configuration ===
+Mode: features, Rank: 8, Alpha: 16.0, Epochs: 20, LR: 0.0001
+Best Seen Validation Accuracy: 0.8671
+Unseen Zero-Shot Accuracy: 0.0005
+Per-Language Unseen Accuracy:
+  Hindi: 0.0002
+  Assamese: 0.0003
+  Bengali: 0.0004
+  Tamil: 0.0015
+--------------------------------------------------
+

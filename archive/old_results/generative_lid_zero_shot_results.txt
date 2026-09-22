@@ -1,0 +1,30 @@
+GENERATIVE LID ZERO-SHOT EXPERIMENT RESULTS
+===========================================
+
+Seen Languages: ['Marathi', 'Kannada', 'English', 'Odia', 'Punjabi', 'Malayalam', 'Telugu', 'Gujarati']
+Unseen Languages: ['Hindi', 'Assamese', 'Bengali', 'Tamil']
+
+SEEN LANGUAGES ACCURACY:
+Overall Exact Match: 0.00%
+Overall Substring Match: 91.10%
+Per-language breakdown:
+  English: Exact 0.00% | Substring 88.60%
+  Gujarati: Exact 0.00% | Substring 99.25%
+  Kannada: Exact 0.00% | Substring 86.36%
+  Malayalam: Exact 0.00% | Substring 90.70%
+  Marathi: Exact 0.00% | Substring 86.03%
+  Odia: Exact 0.00% | Substring 95.08%
+  Punjabi: Exact 0.00% | Substring 96.03%
+  Telugu: Exact 0.00% | Substring 83.81%
+
+UNSEEN LANGUAGES ACCURACY:
+Overall Exact Match: 0.00%
+Overall Substring Match: 0.00%
+Per-language breakdown:
+  Assamese: Exact 0.00% | Substring 0.00%
+  Bengali: Exact 0.00% | Substring 0.00%
+  Hindi: Exact 0.00% | Substring 0.00%
+  Tamil: Exact 0.00% | Substring 0.00%
+
+COMPARISON:
+KNN achieves 0% on unseen, CLAP zero-shot achieves 7.63%, Contrastive Adapter achieves 33.95%

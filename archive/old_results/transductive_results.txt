@@ -1,0 +1,6 @@
+Evaluation Mode: language_split
+Baseline Inductive Zero-Shot Accuracy: 23.94%
+--- Transductive Results ---
+Config: [iters=5, alpha=0.5, temp=1.0] -> Accuracy: 23.99%
+
+Best Transductive Config: [iters=5, alpha=0.5, temp=1.0] -> Accuracy: 23.99%
